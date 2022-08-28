@@ -1213,11 +1213,6 @@ class Ui_MainWindow(object):
         kpi_data['日期'] = pd.to_datetime(kpi_data['日期'])
         analysis_dict = self.get_mean_by_date(kpi_data, self.analysis_date_dict[self.analysis_name])
 
-        # print(analysis_dict['mean'], analysis_dict['max'], analysis_dict['min'], sep='\n')
-        # analysis_dict['mean'].to_excel('mean.xls')
-        # analysis_dict['max'].to_excel('max.xls')
-        # analysis_dict['min'].to_excel('min.xls')
-
         self.op_display_image.clear()
         if not self.op_gridlayout:
             self.op_gridlayout = QtWidgets.QGridLayout(self.op_display)
