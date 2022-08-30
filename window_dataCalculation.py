@@ -1804,7 +1804,7 @@ class Ui_MainWindow(object):
         font.setPointSize(14)
         label_4.setFont(font)
         label_4.setObjectName("label_4")
-        label_4.setText("时间窗口大小(分钟):")
+        label_4.setText("时间窗口大小:")
         self.rate_val = QtWidgets.QLineEdit(groupBox_2)
         self.rate_val.setGeometry(QtCore.QRect(170, 26, 60, 30))
         self.rate_val.setObjectName("lineEdit")
@@ -1860,8 +1860,8 @@ class Ui_MainWindow(object):
                 down_threshold = self.custom_down_input_val.text()
                 self.child_df, df_describe = self.fitting_custom_threshold(float(up_threshold), float(down_threshold), self.data)
 
-            print('数据清洗', df_describe)
-            self.child_df.to_excel('清洗后数据.xls')
+            # print('数据清洗', df_describe)
+            # self.child_df.to_excel('清洗后数据.xls')
 
         if self.child_df is None:
             self.child_df = self.df.copy()
@@ -1871,22 +1871,22 @@ class Ui_MainWindow(object):
             moving_size = int(self.child_moving_input_val.text())
             self.child_df, df_describe = self.fitting_moving_avg(moving_size, self.child_df)
 
-            print('移动平均', df_describe)
-            self.child_df.to_excel('移动平均后.xls')
+            # print('移动平均', df_describe)
+            # self.child_df.to_excel('移动平均后.xls')
 
         if len(self.rate_val.text()) == 0:
             return
 
         val = int(self.rate_val.text())
 
-        # 处理 x 轴日期坐标
-        times_list = self.child_df['日期'].to_list()
-        date_list = list(set([x[5:13] for x in times_list]))
-        date_list.sort()
-        date_len = len(date_list)
-        if date_len > 9:
-            date_range = [i for i in range(0, date_len, date_len // 9)]
-            date_list = [date_list[i] for i in date_range]
+        # # 处理 x 轴日期坐标
+        # times_list = self.child_df['日期'].to_list()
+        # date_list = list(set([x[5:13] for x in times_list]))
+        # date_list.sort()
+        # date_len = len(date_list)
+        # if date_len > 9:
+        #     date_range = [i for i in range(0, date_len, date_len // 9)]
+        #     date_list = [date_list[i] for i in date_range]
 
         if self.child_fitting_type_name == '拟合斜率':
             changing_type = 1
@@ -1905,8 +1905,7 @@ class Ui_MainWindow(object):
         self.op_gridlayout.addWidget(self.op_tooBar, 0, 0)
         self.op_gridlayout.addWidget(self.op_display_image, 1, 0)
 
-        print(changing_rate_name, curve_trend_list)
-        self.op_display_image.showImage_changing_rate(curve_trend_list, date_list, title=changing_rate_name)
+        self.op_display_image.showImage_changing_rate(curve_trend_list, self.child_df, title=changing_rate_name)
 
         self.show()
 
@@ -1932,7 +1931,7 @@ class Ui_MainWindow(object):
             # 拟合斜率-总体变化率
             k, b = optimize.curve_fit(self.fitting_func_1, np.arange(
                 kpi_data.shape[0]), values)[0]
-            value_df = value_df.rolling(time_size, min_periods=5).apply(
+            value_df = value_df.rolling(time_size, min_periods=time_size).apply(
                 lambda x: self.curve_fit_fun(x) / (expanding_minutes / len(values)))
 
         elif fun_type == 2:
@@ -1940,9 +1939,12 @@ class Ui_MainWindow(object):
             expanding_minutes = expanding_seconds / 60
             # 最大值和最小值差值-总体变化率
             k = (max(values) - min(values)) / (np.argmax(values) - np.argmin(values))
-            value_df = value_df.rolling(time_size, min_periods=5).apply(
-                lambda x: self.min_max_fit_fun(x) / (expanding_minutes / len(values)))
-        return k, value_df.values.tolist()
+            value_df = value_df.rolling(time_size, min_periods=time_size).apply(
+                lambda x: self.min_max_fit_fun(x))
+
+        value_df['日期'] = value_df.index
+        value_df['监控项的值'] = value_df[0]
+        return k, value_df[['日期', '监控项的值']]
 
     def curve_fit_fun(self, values):
         """
@@ -1959,8 +1961,11 @@ class Ui_MainWindow(object):
         :param values:
         :return:
         """
-        k = (max(values) - min(values)) / (np.argmax(values) - np.argmin(values))
-        return k
+        times = pd.to_datetime(values.index)
+        expanding_seconds = (times[np.argmax(values)] - times[np.argmin(values)]).seconds
+        expanding_minutes = expanding_seconds / 60
+        k = (max(values) - min(values))
+        return k / (expanding_minutes / (np.argmax(values) - np.argmin(values)))
 
     def threePhase_child_window(self):
         """
@@ -2861,16 +2866,18 @@ class figure_original(FigureCanvas):
         self.myAxes.set_title(title)
         self.fig.canvas.draw_idle()
 
-    def showImage_changing_rate(self, kpi_data, times_list, title=None):
+    def showImage_changing_rate(self, kpi_data, origin_data, title=None):
         self.myAxes.cla()
-        self.myAxes.plot(kpi_data)
+        origin_data['日期'] = pd.to_datetime(origin_data['日期'])
+        data = origin_data[['日期', '监控项的值']]
+        self.myAxes.plot(data['日期'], data['监控项的值'])
+        self.myAxes.plot(kpi_data['日期'], kpi_data['监控项的值'])
         self.myAxes.set_xlabel('时间')
+        self.myAxes.legend(['数据趋势', '变化率'])
         self.myAxes.grid()
         self.myAxes.set_title(title)
-        times_list.sort()
-        # 第一个元素会丢失，具体原因未知， 暂时添加 0
-        times_list.insert(0, 1)
-        plt.setp(self.myAxes.set_xticklabels(times_list, rotation=20, fontsize=9))
+        # times_list.sort()
+        # plt.setp(self.myAxes.set_xticklabels(times_list, rotation=20, fontsize=9))
         self.fig.canvas.draw_idle()
 
     def showImage_three_electric(self, kpi_data, mean=None, A=None, B=None, C=None, D=None, E=None, legend=None, title=None, display=1):
