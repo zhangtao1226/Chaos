@@ -2380,8 +2380,10 @@ class Ui_MainWindow(object):
             df = self.data[(self.data['设备名称'] == data[0]) & (self.data['测点名称'] == data[1]) & (self.data['监控项名称'] == data[2])]
             item_list.append(list(df['监控项的值']))
 
-        item_len = len(item_list)
+            # 导出已选数据项
+            # df.to_excel('%s.xls'% data[2], index=None)
 
+        item_len = len(item_list)
 
         if item_len < 2:
             return
@@ -2399,7 +2401,9 @@ class Ui_MainWindow(object):
         for item in all_list:
             mean = self.get_mean(item)
             mean_list.append(mean)
-        print('均值', mean_list)
+        # 均值导出
+        # pd.DataFrame(mean_list).to_excel('均值.xls')
+        # print('均值', mean_list)
         all_deviation_list = []
         status = 1
         title = '均值'
@@ -2429,6 +2433,9 @@ class Ui_MainWindow(object):
             for i in range(len(item)):
                 child_deviation_list[i].append(item[i])
 
+        # pd.DataFrame(child_deviation_list[0]).to_excel('0偏差.xls')
+        # pd.DataFrame(child_deviation_list[1]).to_excel('1偏差.xls')
+        # pd.DataFrame(child_deviation_list[2]).to_excel('2偏差.xls')
         legend_list = []
         for item in data_list:
             legend_list.append(item[2] + '偏差')
@@ -2444,14 +2451,15 @@ class Ui_MainWindow(object):
         statistical_desc = []
         for i in range(len(child_deviation_list)):
             desc_dict = dict()
-            child_deviation_list[i].sort()
+            new_child_deviation_list = child_deviation_list[i].copy()
+            new_child_deviation_list.sort()
             desc_dict['数据项名称'] = legend_list[i][0:len(legend_list[i])-2]
-            desc_dict['均值'] = round(np.mean(child_deviation_list[i]), 2)
-            desc_dict['标准差'] = round(np.std(child_deviation_list[i]), 2)
-            desc_dict['最小值'] = np.min(child_deviation_list[i])
-            desc_dict['最大值'] = np.max(child_deviation_list[i])
-            desc_dict['上四分位数'] = np.percentile(child_deviation_list[i], (25))
-            desc_dict['下四分位数'] = np.percentile(child_deviation_list[i], (75))
+            desc_dict['均值'] = round(np.mean(new_child_deviation_list), 2)
+            desc_dict['标准差'] = round(np.std(new_child_deviation_list), 2)
+            desc_dict['最小值'] = np.min(new_child_deviation_list)
+            desc_dict['最大值'] = np.max(new_child_deviation_list)
+            desc_dict['上四分位数'] = np.percentile(new_child_deviation_list, (25))
+            desc_dict['下四分位数'] = np.percentile(new_child_deviation_list, (75))
 
             statistical_desc.append(desc_dict)
 
@@ -2525,7 +2533,6 @@ class Ui_MainWindow(object):
                 dev = round(item - mean, 2)
 
             deviation_list.append(dev)
-        print('偏差：', deviation_list)
         return deviation_list
 
     def three_display_fun(self):
