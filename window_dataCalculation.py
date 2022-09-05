@@ -405,7 +405,6 @@ class Ui_MainWindow(object):
         文件导出
         :return:
         """
-
         currentPath = QDir.currentPath()
         title = "选择一个文件"
         filter = "所有文件(*.*);;文本文件(*.txt);;图片文档(*.jpg *.png *.gif)"
@@ -2844,6 +2843,7 @@ class figure_original(FigureCanvas):
         self.fig = Figure()
         FigureCanvas.__init__(self, self.fig)
         self.myAxes = self.fig.add_subplot(111)
+        self.myAxes2 = self.myAxes.twinx()
 
     def showImage_original(self, df, title=None, display='scatter'):
         self.myAxes.cla()
@@ -2951,12 +2951,17 @@ class figure_original(FigureCanvas):
 
     def showImage_changing_rate(self, kpi_data, origin_data, title=None):
         self.myAxes.cla()
+        self.myAxes2.cla()
         origin_data['日期'] = pd.to_datetime(origin_data['日期'])
         data = origin_data[['日期', '监控项的值']]
-        self.myAxes.plot(data['日期'], data['监控项的值'])
-        self.myAxes.plot(kpi_data['日期'], kpi_data['监控项的值'])
+        line1 = self.myAxes.plot(data['日期'], data['监控项的值'])
+        self.myAxes.set_ylabel('数据项的值')
+
+        line2 = self.myAxes2.plot(kpi_data['日期'], kpi_data['监控项的值'], color='r', label='变化率')
+        self.myAxes2.set_ylabel('变化率')
         self.myAxes.set_xlabel('时间')
-        self.myAxes.legend(['数据趋势', '变化率'])
+        lines = line1 + line2
+        self.myAxes.legend(lines, ['数据趋势', '变化率'])
         self.myAxes.grid()
         self.myAxes.set_title(title)
         self.fig.canvas.draw_idle()
