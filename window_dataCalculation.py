@@ -304,7 +304,7 @@ class Ui_MainWindow(object):
         if menu_name == '上传文件':
             self.upload_file_func()
         elif menu_name == '导出文件':
-            pass
+            self.download_file_func()
         elif menu_name == '3-sigma':
             self.sigma_child_window()
         elif menu_name == '箱形图':
@@ -400,6 +400,19 @@ class Ui_MainWindow(object):
         self.display_name = self.display_dict[display]
         self.show_style_list.currentIndexChanged.connect(self.display_change)
 
+    def download_file_func(self):
+        """
+        文件导出
+        :return:
+        """
+
+        currentPath = QDir.currentPath()
+        title = "选择一个文件"
+        filter = "所有文件(*.*);;文本文件(*.txt);;图片文档(*.jpg *.png *.gif)"
+        save_path, filtUsed = QFileDialog.getSaveFileName(self, title, currentPath, filter)
+        self.new_df.to_excel(save_path + '.xls', index=None)
+
+
     def change_data_item(self):
         self.had_selected_dataItem = self.data_item_list.currentText()
 
@@ -445,11 +458,9 @@ class Ui_MainWindow(object):
         """
         self.station_list.clear()
         self.had_selected_device = self.device_list.currentText()
-        # print('已选设备：%s'% self.had_selected_device)
         new_data = self.data[(self.data['日期'] >= self.had_selected_start_date) & (self.data['日期'] <= self.had_selected_end) & (self.data['设备名称'] == self.had_selected_device)]
 
         stations_list = list(set(new_data['测点名称']))
-        # print('已选设备的所有测点：', stations_list)
         for station in stations_list:
             self.station_list.addItem(station)
 
@@ -505,35 +516,13 @@ class Ui_MainWindow(object):
             self.origin_data_desc_table.setItem(i, 0, QTableWidgetItem(labels_key[i]))
             self.origin_data_desc_table.setItem(i, 1, QTableWidgetItem(str(labels_val[i])))
 
-    def create_filter_data(self):
-        """
-        获取过滤数据，根据已选条件
-        :return:
-        """
-        # start_date = self.start_data_list.currentText() + ' 00:00:00'
-        # end_date = self.end_data_list.currentText() + '23:59:59'
-        # device = self.device_list.currentText()
-        # station = self.station_list.currentText()
-        # data_item = self.data_item_list.currentText()
-        # self.df = self.data[
-        #     (self.data['日期'] >= start_date) & (self.data['日期'] <= end_date) & (self.data['设备名称'] == device) & (
-        #                 self.data['测点名称'] == station) & (self.data['监控项名称'] == data_item)]
-
-    def download_file_func(self):
-        """
-        下载处理后数据文件
-        :return:
-        """
-        pass
-
-
     def sigma_child_window(self):
         """
         3-sigma 弹出子窗口
         :return:
         """
         self.child_window.setWindowTitle('3-sigma')
-        self.child_window.setFixedSize(600, 400)
+        self.child_window.setFixedSize(600, 450)
         # 算法描述
         groupBox = QtWidgets.QGroupBox(self.child_window)
         groupBox.setGeometry(QtCore.QRect(15, 10, 570, 90))
@@ -562,7 +551,16 @@ class Ui_MainWindow(object):
         pushButton.setFont(font)
         pushButton.setObjectName("pushButton")
         pushButton.setText("去除异常值")
-
+        size_label = QtWidgets.QLabel(groupBox_2)
+        size_label.setGeometry(QtCore.QRect(170, 35, 110, 40))
+        size_label.setFont(font)
+        size_label.setText("窗口大小(点数):")
+        self.clean_sigma_value = QtWidgets.QLineEdit(groupBox_2)
+        self.clean_sigma_value.setGeometry(QtCore.QRect(290, 35, 50, 40))
+        font.setPointSize(13)
+        self.clean_sigma_value.setFont(font)
+        self.clean_sigma_value.setText("")
+        self.clean_sigma_value.setObjectName("lineEdit")
 
         # 算法结果
         groupBox_3 = QtWidgets.QGroupBox(self.child_window)
@@ -627,27 +625,18 @@ class Ui_MainWindow(object):
 
         pushButton.clicked.connect(partial(self.sigma_func, lineEdit, lineEdit_2, lineEdit_3, lineEdit_4))
 
+        # 展示方式
+        self.curve_display_type(Y=330)
+
         # 窗口确认、取消
-        pushButton_2 = QtWidgets.QPushButton(self.child_window)
-        pushButton_2.setGeometry(QtCore.QRect(150, 335, 120, 50))
-        font.setPointSize(16)
-        pushButton_2.setFont(font)
-        pushButton_2.setObjectName("pushButton_2")
-        pushButton_2.setText("取消")
-        pushButton_2.clicked.connect(self.close_child_window)
-        pushButton_3 = QtWidgets.QPushButton(self.child_window)
-        pushButton_3.setGeometry(QtCore.QRect(330, 335, 120, 50))
-        pushButton_3.setFont(font)
-        pushButton_3.setObjectName("pushButton_3")
-        pushButton_3.setText("确定")
-        pushButton_3.clicked.connect(self.sigma_ok)
+        self.child_window_buttons(self.child_window, self.sigma_ok, X=150, Y=405, is_clean=0)
 
         self.child_window.resize(False, False)
         self.child_window.show()
 
     def sigma_func(self, lineEdit, lineEdit2, lineEdit3, lineEdit4):
         """
-
+        数据清洗-3-sigma
         :return:
         """
         values = self.df['监控项的值']
@@ -660,28 +649,78 @@ class Ui_MainWindow(object):
         lineEdit3.setText(str(self.sigma_up_threshold))
         lineEdit4.setText(str(self.sigma_down_threshold))
 
+    def sigma_clean_func(self, data, size):
+        """
+        3-sigma 根据点数，移动清洗
+        :param data: 清洗的数据源， Dataframe格式
+        :param size: 窗口大小，即点数
+        :return: DataFrame 格式数据
+        """
+        df = data.groupby(data.index // size).apply(lambda x: self.filter_data(x, 1))
+
+        return df.reset_index()[['日期', '监控项的值']]
+
+    def filter_data(self, data, clean_name):
+        """
+        数据过滤
+        :param data: DataFrame格式的数据
+        :param clean_name: 清洗方式：1：3-sigma；2：box（箱形图）
+        :return:
+        """
+        mean = None
+        std = None
+        down_threshold = None
+        upper_threshold = None
+        if clean_name == 1:
+            # 方式一：
+            values = data['监控项的值']
+            mean = np.mean(values)
+            std = np.std(values)
+            # down_threshold = mean - 3 * std
+            # upper_threshold = mean + 3 * std
+            # 方式二：
+            down_threshold = data['监控项的值'].quantile(0.03)
+            upper_threshold = data['监控项的值'].quantile(0.97)
+        elif clean_name == 2:
+            Q3 = data['监控项的值'].quantile(0.75)
+            Q1 = data['监控项的值'].quantile(0.25)
+            upper_threshold = Q3 + 1.5 * (Q3 - Q1)
+            down_threshold = Q1 - 1.5 * (Q3 - Q1)
+        # 根据上下限进行数据筛选
+        df = data[(data['监控项的值'] > down_threshold) & (data['监控项的值'] < upper_threshold)]
+        return df
+
     def sigma_ok(self):
         """
         3-sigma 弹框确定
         :return:
         """
-        start_date = self.start_data_list.currentText() + ' 00:00:00'
-        end_date = self.end_data_list.currentText() + '23:59:59'
+        if self.df is None:
+            print("未选择数据项")
+            return
+
+        if len(self.clean_sigma_value.text()) == 0:
+            print('请输入：3-sigma的移动窗口大小')
+            return
+
         device = self.device_list.currentText()
         station = self.station_list.currentText()
         data_item = self.data_item_list.currentText()
-        self.df = self.data[
-            (self.data['日期'] >= start_date) & (self.data['日期'] <= end_date) & (self.data['设备名称'] == device) & (
-                    self.data['测点名称'] == station) & (self.data['监控项名称'] == data_item)]
         date_list = pd.to_datetime(self.df['日期'])
         value_list = self.df['监控项的值']
         pre_df = pd.DataFrame(data=value_list.tolist(), index=date_list)
 
-        aft_df = self.df[(self.df['监控项的值'] >= self.sigma_down_threshold) & (self.df['监控项的值'] <= self.sigma_up_threshold)]
+        aft_df = self.sigma_clean_func(self.df, int(self.clean_sigma_value.text()))
         self.new_df = aft_df
         aft_date_list = pd.to_datetime(aft_df['日期'])
         aft_value_list = aft_df['监控项的值']
         aft_df = pd.DataFrame(data=aft_value_list.tolist(), index=aft_date_list)
+
+        # 判断展示方式
+        if self.curve_display_name == '折线图':
+            display = 1
+        else:
+            display = 2
 
         title = '%s - %s - %s' % (device, station, data_item)
         self.op_display_image.clear()
@@ -690,7 +729,7 @@ class Ui_MainWindow(object):
         self.op_tooBar = NavigationToolbar(self.op_display_image, self)
         self.op_gridlayout.addWidget(self.op_tooBar, 0, 0)
         self.op_gridlayout.addWidget(self.op_display_image, 1, 0)
-        self.op_display_image.showImage_original_two_abnormal(pre_df, '处理前', aft_df, '处理后', self.sigma_down_threshold, self.sigma_up_threshold, title)
+        self.op_display_image.showImage_original_two_abnormal(pre_df, '处理前', aft_df, '处理后', display, title)
         self.show()
 
         operate_data_desc = aft_value_list.describe()
@@ -712,6 +751,7 @@ class Ui_MainWindow(object):
         :return:
         """
         self.child_window.setWindowTitle('箱形图')
+        self.child_window.setFixedSize(600, 450)
 
         # 算法描述
         groupBox = QtWidgets.QGroupBox(self.child_window)
@@ -742,22 +782,35 @@ class Ui_MainWindow(object):
         pushButton.setObjectName("pushButton")
         pushButton.setText("去除异常值")
 
+        # 移动窗口
+        size_label = QtWidgets.QLabel(groupBox_2)
+        size_label.setGeometry(QtCore.QRect(170, 35, 110, 40))
+        size_label.setFont(font)
+        size_label.setText("窗口大小(点数):")
+        self.clean_box_value = QtWidgets.QLineEdit(groupBox_2)
+        self.clean_box_value.setGeometry(QtCore.QRect(290, 35, 50, 40))
+        font.setPointSize(13)
+        self.clean_box_value.setFont(font)
+        self.clean_box_value.setText("")
+        self.clean_box_value.setObjectName("lineEdit")
+
         # 算法结果
         groupBox_3 = QtWidgets.QGroupBox(self.child_window)
-        groupBox_3.setGeometry(QtCore.QRect(15, 220, 570, 100))
+        groupBox_3.setGeometry(QtCore.QRect(15, 220, 570, 70))
         font = QtGui.QFont()
         font.setPointSize(16)
         groupBox_3.setFont(font)
         groupBox_3.setObjectName("groupBox_3")
+        groupBox_3.setTitle("结果(整体计算结果)")
         label_2 = QtWidgets.QLabel(groupBox_3)
-        label_2.setGeometry(QtCore.QRect(20, 50, 65, 30))
+        label_2.setGeometry(QtCore.QRect(20, 30, 65, 30))
         font = QtGui.QFont()
         font.setPointSize(14)
         label_2.setFont(font)
         label_2.setObjectName("label_2")
         label_2.setText("上四分位")
         lineEdit = QtWidgets.QLineEdit(groupBox_3)
-        lineEdit.setGeometry(QtCore.QRect(85, 50, 60, 30))
+        lineEdit.setGeometry(QtCore.QRect(85, 30, 60, 30))
         font = QtGui.QFont()
         font.setPointSize(13)
         lineEdit.setFont(font)
@@ -765,14 +818,14 @@ class Ui_MainWindow(object):
         lineEdit.setReadOnly(True)
         lineEdit.setObjectName("lineEdit")
         label_3 = QtWidgets.QLabel(groupBox_3)
-        label_3.setGeometry(QtCore.QRect(155, 50, 63, 30))
+        label_3.setGeometry(QtCore.QRect(155, 30, 63, 30))
         font = QtGui.QFont()
         font.setPointSize(14)
         label_3.setFont(font)
         label_3.setObjectName("label_3")
         label_3.setText("下四分位")
         lineEdit_2 = QtWidgets.QLineEdit(groupBox_3)
-        lineEdit_2.setGeometry(QtCore.QRect(220, 50, 60, 30))
+        lineEdit_2.setGeometry(QtCore.QRect(220, 30, 60, 30))
         font = QtGui.QFont()
         font.setPointSize(13)
         lineEdit_2.setFont(font)
@@ -780,14 +833,14 @@ class Ui_MainWindow(object):
         lineEdit_2.setReadOnly(True)
         lineEdit_2.setObjectName("lineEdit_2")
         label_4 = QtWidgets.QLabel(groupBox_3)
-        label_4.setGeometry(QtCore.QRect(295, 50, 50, 30))
+        label_4.setGeometry(QtCore.QRect(295, 30, 50, 30))
         font = QtGui.QFont()
         font.setPointSize(14)
         label_4.setFont(font)
         label_4.setObjectName("label_4")
         label_4.setText("上限值")
         lineEdit_3 = QtWidgets.QLineEdit(groupBox_3)
-        lineEdit_3.setGeometry(QtCore.QRect(345, 50, 60, 30))
+        lineEdit_3.setGeometry(QtCore.QRect(345, 30, 60, 30))
         font = QtGui.QFont()
         font.setPointSize(13)
         lineEdit_3.setFont(font)
@@ -795,14 +848,14 @@ class Ui_MainWindow(object):
         lineEdit_3.setReadOnly(True)
         lineEdit_3.setObjectName("lineEdit_3")
         label_5 = QtWidgets.QLabel(groupBox_3)
-        label_5.setGeometry(QtCore.QRect(430, 50, 50, 30))
+        label_5.setGeometry(QtCore.QRect(430, 30, 50, 30))
         font = QtGui.QFont()
         font.setPointSize(14)
         label_5.setFont(font)
         label_5.setObjectName("label_5")
         label_5.setText("下限值")
         lineEdit_4 = QtWidgets.QLineEdit(groupBox_3)
-        lineEdit_4.setGeometry(QtCore.QRect(480, 50, 60, 30))
+        lineEdit_4.setGeometry(QtCore.QRect(480, 30, 60, 30))
         font = QtGui.QFont()
         font.setPointSize(13)
         lineEdit_4.setFont(font)
@@ -812,22 +865,12 @@ class Ui_MainWindow(object):
 
         pushButton.clicked.connect(partial(self.box_func, lineEdit, lineEdit_2, lineEdit_3, lineEdit_4))
 
-        # 窗口确认、取消
-        pushButton_2 = QtWidgets.QPushButton(self.child_window)
-        pushButton_2.setGeometry(QtCore.QRect(150, 335, 120, 50))
-        font.setPointSize(16)
-        pushButton_2.setFont(font)
-        pushButton_2.setObjectName("pushButton_2")
-        pushButton_2.setText("取消")
-        pushButton_2.clicked.connect(self.close_child_window)
-        pushButton_3 = QtWidgets.QPushButton(self.child_window)
-        pushButton_3.setGeometry(QtCore.QRect(330, 335, 120, 50))
-        pushButton_3.setFont(font)
-        pushButton_3.setObjectName("pushButton_3")
-        pushButton_3.setText("确定")
-        pushButton_3.clicked.connect(self.box_ok)
+        # 展示方式
+        self.curve_display_type(Y=320)
 
-        self.child_window.setFixedSize(600, 400)
+        # 窗口确认、取消
+        self.child_window_buttons(self.child_window, self.box_ok, X=150, Y=405, is_clean=0)
+
         self.child_window.resize(False, False)
         self.child_window.show()
 
@@ -853,17 +896,29 @@ class Ui_MainWindow(object):
         箱形图
         :return:
         """
+        if self.df is None:
+            print('箱形图清洗， 未选择数据项')
+            return
+        if len(self.clean_box_value.text()) == 0:
+            print('箱形图清洗，未输入移动窗口大小')
+            return
+
         title = '%s - %s - %s' % (self.had_selected_device, self.had_selected_station, self.had_selected_dataItem)
         date_list = pd.to_datetime(self.df['日期'])
         value_list = self.df['监控项的值']
         pre_df = pd.DataFrame(data=value_list.tolist(), index=date_list)
 
-        aft_df = self.df[
-            (self.df['监控项的值'] >= self.box_down_threshold) & (self.df['监控项的值'] <= self.box_up_threshold)]
+        aft_df = self.sigma_clean_func(self.df, int(self.clean_box_value.text()))
         self.new_df = aft_df
         aft_date_list = pd.to_datetime(aft_df['日期'])
         aft_value_list = aft_df['监控项的值']
         aft_df = pd.DataFrame(data=aft_value_list.tolist(), index=aft_date_list)
+
+        # 判断展示方式
+        if self.curve_display_name == '折线图':
+            display = 1
+        else:
+            display = 2
 
         self.op_display_image.clear()
         if not self.op_gridlayout:
@@ -871,8 +926,7 @@ class Ui_MainWindow(object):
         self.op_tooBar = NavigationToolbar(self.op_display_image, self)
         self.op_gridlayout.addWidget(self.op_tooBar, 0, 0)
         self.op_gridlayout.addWidget(self.op_display_image, 1, 0)
-        self.op_display_image.showImage_original_two_abnormal(pre_df, '处理前', aft_df, '处理后', self.box_down_threshold,
-                                                              self.box_up_threshold, title)
+        self.op_display_image.showImage_original_two_abnormal(pre_df, '处理前', aft_df, '处理后', display, title)
         self.show()
 
         operate_data_desc = aft_value_list.describe()
@@ -1387,8 +1441,6 @@ class Ui_MainWindow(object):
             data_item_1.currentIndexChanged.connect(partial(self.child_item_change, data_item_1, 1))
             data_item_2.currentIndexChanged.connect(partial(self.child_item_change, data_item_2, 2))
 
-        # print('已选设备信息', self.fitting_had_select_data)
-
         # 数据清洗
         self.child_clean_data(self.child_window, 15, 320)
 
@@ -1515,21 +1567,29 @@ class Ui_MainWindow(object):
                 self.custom_up_input_val.hide()
                 self.custom_down_label_name.hide()
                 self.custom_down_input_val.hide()
+                self.clean_moving_label_name.show()
+                self.clean_moving_input_val.show()
             elif self.clear_name == '箱形图':
                 self.custom_up_label_name.hide()
                 self.custom_up_input_val.hide()
                 self.custom_down_label_name.hide()
                 self.custom_down_input_val.hide()
+                self.clean_moving_label_name.show()
+                self.clean_moving_input_val.show()
             elif self.clear_name == '自定义阈值':
                 self.custom_up_label_name.show()
                 self.custom_up_input_val.show()
                 self.custom_down_label_name.show()
                 self.custom_down_input_val.show()
+                self.clean_moving_label_name.hide()
+                self.clean_moving_input_val.hide()
             elif self.clear_name == '不清洗':
                 self.custom_up_label_name.hide()
                 self.custom_up_input_val.hide()
                 self.custom_down_label_name.hide()
                 self.custom_down_input_val.hide()
+                self.clean_moving_label_name.hide()
+                self.clean_moving_input_val.hide()
 
                 self.clear_name = None
 
@@ -1581,9 +1641,15 @@ class Ui_MainWindow(object):
         describe_2 = None
 
         if self.clear_name == '3-sigma':
+            if len(self.clean_moving_input_val.text()) == 0:
+                print('未输入移动窗口大小')
+                return
             new_df_1, describe_1 = self.fitting_sigma_func(df_1)
             new_df_2, describe_2 = self.fitting_sigma_func(df_2)
         elif self.clear_name == '箱形图':
+            if len(self.clean_moving_input_val.text()) == 0:
+                print('未输入移动窗口大小')
+                return
             new_df_1, describe_1 = self.fitting_box_func(df_1)
             new_df_2, describe_2 = self.fitting_box_func(df_2)
         elif self.clear_name == '移动平均':
@@ -1599,8 +1665,6 @@ class Ui_MainWindow(object):
                 return
             new_df_1, describe_1 = self.fitting_custom_threshold(int(up_threshold), int(down_threshold), df_1)
             new_df_2, describe_2 = self.fitting_custom_threshold(int(up_threshold), int(down_threshold), df_2)
-
-        # new_df_1.to_excel('%s-清理后.xlsx'% self.clear_name)
 
         self.fitting_had_df1 = new_df_1
         self.fitting_had_df2 = new_df_2
@@ -1660,7 +1724,6 @@ class Ui_MainWindow(object):
 
         describe_list_1 = list(describe_1.keys())
         describe_list_2 = list(describe_2.keys())
-        print(describe_list_1, describe_list_2)
 
         labels_key = ['拟合公式', 'R^2', '清洗方法', '数据项名']
         for label in describe_list_1:
@@ -1709,7 +1772,7 @@ class Ui_MainWindow(object):
         sigma_std = round(np.std(values), 2)
         sigma_up_threshold = round((sigma_mean + 3 * sigma_std), 2)
         sigma_down_threshold = round((sigma_mean - 3 * sigma_std), 2)
-        res_df = df[(df['监控项的值'] >= sigma_down_threshold) & (df['监控项的值'] <= sigma_up_threshold)]
+        res_df = self.sigma_clean_func(df, int(self.clean_moving_input_val.text()))
         describe_dict['均值'] = sigma_mean
         describe_dict['标准差'] = sigma_std
         describe_dict['上限值'] = sigma_up_threshold
@@ -1728,7 +1791,7 @@ class Ui_MainWindow(object):
         Q3 = round(np.quantile(data_list, 0.75), 2)
         box_up_threshold = round(Q3 + 1.5 * (Q3 - Q1), 2)
         box_down_threshold = round(Q1 - 1.5 * (Q3 - Q1), 2)
-        res_df = df[(df['监控项的值'] >= box_down_threshold) & (df['监控项的值'] <= box_up_threshold)]
+        res_df = self.sigma_clean_func(df, int(self.clean_moving_input_val.text()))
         # describe_dict['数据清洗'] = '箱形图'
         describe_dict['上限值'] = box_up_threshold
         describe_dict['下限值'] = box_down_threshold
@@ -1858,10 +1921,7 @@ class Ui_MainWindow(object):
             elif self.clear_name == '自定义阈值':
                 up_threshold = self.custom_up_input_val.text()
                 down_threshold = self.custom_down_input_val.text()
-                self.child_df, df_describe = self.fitting_custom_threshold(float(up_threshold), float(down_threshold), self.data)
-
-            # print('数据清洗', df_describe)
-            # self.child_df.to_excel('清洗后数据.xls')
+                self.child_df, df_describe = self.fitting_custom_threshold(float(up_threshold), float(down_threshold), self.df)
 
         if self.child_df is None:
             self.child_df = self.df.copy()
@@ -1871,22 +1931,10 @@ class Ui_MainWindow(object):
             moving_size = int(self.child_moving_input_val.text())
             self.child_df, df_describe = self.fitting_moving_avg(moving_size, self.child_df)
 
-            # print('移动平均', df_describe)
-            # self.child_df.to_excel('移动平均后.xls')
-
         if len(self.rate_val.text()) == 0:
             return
 
         val = int(self.rate_val.text())
-
-        # # 处理 x 轴日期坐标
-        # times_list = self.child_df['日期'].to_list()
-        # date_list = list(set([x[5:13] for x in times_list]))
-        # date_list.sort()
-        # date_len = len(date_list)
-        # if date_len > 9:
-        #     date_range = [i for i in range(0, date_len, date_len // 9)]
-        #     date_list = [date_list[i] for i in date_range]
 
         if self.child_fitting_type_name == '拟合斜率':
             changing_type = 1
@@ -2383,10 +2431,25 @@ class Ui_MainWindow(object):
         item_list = list()
         for data in data_list:
             df = self.data[(self.data['设备名称'] == data[0]) & (self.data['测点名称'] == data[1]) & (self.data['监控项名称'] == data[2])]
+            if self.clear_name is not None:
+                if self.clear_name == '3-sigma':
+                    df, df_describe = self.fitting_sigma_func(df)
+                elif self.clear_name == '箱形图':
+                    df, df_describe = self.fitting_box_func(df)
+                elif self.clear_name == '自定义阈值':
+                    up_threshold = self.custom_up_input_val.text()
+                    down_threshold = self.custom_down_input_val.text()
+                    df, df_describe = self.fitting_custom_threshold(float(up_threshold), float(down_threshold), df)
+
+            # 判断是否进行移动平均
+            if self.child_moving_avg.isChecked() and self.child_moving_input_val.text():
+                moving_size = int(self.child_moving_input_val.text())
+                df, df_describe = self.fitting_moving_avg(moving_size, df)
+
+            # df.to_excel('%s表.xls'% data[2])
+
             item_list.append(list(df['监控项的值']))
 
-            # 导出已选数据项
-            # df.to_excel('%s.xls'% data[2], index=None)
 
         item_len = len(item_list)
 
@@ -2406,9 +2469,9 @@ class Ui_MainWindow(object):
         for item in all_list:
             mean = self.get_mean(item)
             mean_list.append(mean)
-        # 均值导出
-        # pd.DataFrame(mean_list).to_excel('均值.xls')
-        # print('均值', mean_list)
+
+        # pd.DataFrame(mean_list).to_excel('均值.xls', index=None)
+
         all_deviation_list = []
         status = 1
         title = '均值'
@@ -2438,9 +2501,6 @@ class Ui_MainWindow(object):
             for i in range(len(item)):
                 child_deviation_list[i].append(item[i])
 
-        # pd.DataFrame(child_deviation_list[0]).to_excel('0偏差.xls')
-        # pd.DataFrame(child_deviation_list[1]).to_excel('1偏差.xls')
-        # pd.DataFrame(child_deviation_list[2]).to_excel('2偏差.xls')
         legend_list = []
         for item in data_list:
             legend_list.append(item[2] + '偏差')
@@ -2605,6 +2665,20 @@ class Ui_MainWindow(object):
         self.child_custom.toggled.connect(partial(self.child_clean_button, ))
 
         font.setPointSize(14)
+        # 移动窗口输入值
+        self.clean_moving_label_name = QtWidgets.QLabel(clean_groupBox)
+        self.clean_moving_label_name.setGeometry(QtCore.QRect(450, 20, 120, 40))
+        self.clean_moving_label_name.setFont(font)
+        self.clean_moving_label_name.setText('窗口大小(点数):')
+        self.clean_moving_label_name.hide()
+
+        self.clean_moving_input_val = QtWidgets.QLineEdit(clean_groupBox)
+        self.clean_moving_input_val.setGeometry(QtCore.QRect(580, 25, 60, 30))
+        self.clean_moving_input_val.setFont(font)
+        self.clean_moving_input_val.setText("")
+        self.clean_moving_input_val.hide()
+
+
         # 自定义阈值输入
         self.custom_up_label_name = QtWidgets.QLabel(clean_groupBox)
         self.custom_up_label_name.setGeometry(QtCore.QRect(450, 20, 60, 40))
@@ -2633,14 +2707,20 @@ class Ui_MainWindow(object):
         # 判断之前是否操作
         if self.clear_name == '3-sigma':
             self.child_sigma.setChecked(True)
+            self.clean_moving_label_name.show()
+            self.clean_moving_input_val.show()
         elif self.clear_name == '箱形图':
             self.child_box.setChecked(True)
+            self.clean_moving_label_name.show()
+            self.clean_moving_input_val.show()
         elif self.clear_name == '自定义阈值':
             self.child_custom.setChecked(True)
             self.custom_up_label_name.show()
             self.custom_up_input_val.show()
             self.custom_down_label_name.show()
             self.custom_down_input_val.show()
+            self.clean_moving_label_name.hide()
+            self.clean_moving_input_val.hide()
         elif self.clear_name == '不清洗':
             self.no_clean.setChecked(True)
 
@@ -2674,13 +2754,14 @@ class Ui_MainWindow(object):
         self.child_moving_input_val.setFont(font)
         self.child_moving_input_val.setText("")
 
-    def child_window_buttons(self, child_window, call_func, X=170, Y=650):
+    def child_window_buttons(self, child_window, call_func, X=170, Y=650, is_clean=1):
         """
         子窗口中按钮， 取消、确定、清楚
         :param X: x轴
         :param Y: y轴
         :param child_window: 子窗口对象
         :param call_func: 确认按钮调用方法
+        :param is_clean: 是否有清楚按钮 0：没有， 1：有
         :return:
         """
         font = QtGui.QFont()
@@ -2699,12 +2780,13 @@ class Ui_MainWindow(object):
         sure_ok.setObjectName("sure_ok")
         sure_ok.setText("确定")
 
-        clean_cache = QtWidgets.QPushButton(child_window)
-        clean_cache.setGeometry(QtCore.QRect(X+300, Y, 100, 40))
-        clean_cache.setFont(font)
-        clean_cache.setObjectName("clean_cache")
-        clean_cache.setText("清空")
-        clean_cache.clicked.connect(self.clean_fitting_record)
+        if is_clean == 1:
+            clean_cache = QtWidgets.QPushButton(child_window)
+            clean_cache.setGeometry(QtCore.QRect(X+300, Y, 100, 40))
+            clean_cache.setFont(font)
+            clean_cache.setObjectName("clean_cache")
+            clean_cache.setText("清空")
+            clean_cache.clicked.connect(self.clean_fitting_record)
 
         sure_ok.clicked.connect(partial(call_func, ))
 
@@ -2721,7 +2803,7 @@ class Ui_MainWindow(object):
         font = QtGui.QFont()
         font.setPointSize(16)
         curve_groupBox.setFont(font)
-        curve_groupBox.setTitle("曲线展示方式")
+        curve_groupBox.setTitle("展示方式")
 
         self.line = QtWidgets.QRadioButton(curve_groupBox)
         self.line.setGeometry(QtCore.QRect(20, 20, 80, 40))
@@ -2806,14 +2888,15 @@ class figure_original(FigureCanvas):
         self.myAxes.set_title(title)
         self.fig.canvas.draw_idle()
 
-    def showImage_original_two_abnormal(self, df1, label1, df2, label2, threshold_down, threshold_up, title=None):
+    def showImage_original_two_abnormal(self, df1, label1, df2, label2, display=1, title=None):
         self.myAxes.cla()
-        self.myAxes.plot(df1, '.', ms=2)
-        self.myAxes.plot(df2, '.', ms=2)
-        self.myAxes.axhline(threshold_up, linestyle='--', color='red')
-        self.myAxes.axhline(threshold_down, linestyle='--', color='red')
-        self.myAxes.text(df1.index[0], threshold_up, '上限')
-        self.myAxes.text(df1.index[0], threshold_down, '下限')
+        if display == 1:
+            self.myAxes.plot(df1)
+            self.myAxes.plot(df2)
+        else:
+            self.myAxes.plot(df1, '.', ms=2)
+            self.myAxes.plot(df2, '.', ms=2)
+
         self.myAxes.legend([label1, label2], loc='upper right')
         self.myAxes.set_xlabel('时间')
         self.myAxes.grid()
@@ -2876,12 +2959,9 @@ class figure_original(FigureCanvas):
         self.myAxes.legend(['数据趋势', '变化率'])
         self.myAxes.grid()
         self.myAxes.set_title(title)
-        # times_list.sort()
-        # plt.setp(self.myAxes.set_xticklabels(times_list, rotation=20, fontsize=9))
         self.fig.canvas.draw_idle()
 
     def showImage_three_electric(self, kpi_data, mean=None, A=None, B=None, C=None, D=None, E=None, legend=None, title=None, display=1):
-        # date_data = pd.to_datetime(kpi_data['日期'])
         self.myAxes.cla()
         if display == 1:
             if mean is not None:
