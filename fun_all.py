@@ -226,16 +226,97 @@ def f_1(x, A, B):
 
 
 if __name__ == '__main__':
-    excel = 2
-    if excel == 1:
-        file = r'高一线-精轧区域-BGV机组-26#锥箱-加速度有效值-三个月数据.xlsx'
-        title = '26#锥箱-传动轴输出侧轴向-加速度有效值'
-    else:
-        file = r'高一线-精轧区域-BGV机组-26#锥箱-速度有效值-三个月数据.xlsx'
-        title = '26#锥箱-传动轴输出侧轴向-速度有效值'
+    # excel = 2
+    # if excel == 1:
+    #     file = r'高一线-精轧区域-BGV机组-26#锥箱-加速度有效值-三个月数据.xlsx'
+    #     title = '26#锥箱-传动轴输出侧轴向-加速度有效值'
+    # else:
+    #     file = r'高一线-精轧区域-BGV机组-26#锥箱-速度有效值-三个月数据.xlsx'
+    #     title = '26#锥箱-传动轴输出侧轴向-速度有效值'
+    title = ''
+    file = '拟合测试数据/工艺与振动补点后.xls'
     df = pd.read_excel(file, header=0)
+    df1 = df[df['监控项名称'] == '轧制规格']
+    df2 = df[df['监控项名称'] == '加速度有效值']
+
+
+
     df['日期'] = pd.to_datetime(df['日期'])
     df = df[['日期', '监控项的值']]
+
+
+    # values = df['监控项的值']
+    # sigma_mean = round(np.mean(values), 2)
+    # sigma_std = round(np.std(values), 2)
+    # sigma_up_threshold = round((sigma_mean + 3 * sigma_std), 2)
+    # sigma_down_threshold = round((sigma_mean - 3 * sigma_std), 2)
+    # sigma_res_df = df[(df['监控项的值'] >= sigma_down_threshold) & (df['监控项的值'] <= sigma_up_threshold)]
+    #
+    # a_df = sigma_res_df[sigma_res_df['监控项的值'] <= 3]
+    # b_df = sigma_res_df[sigma_res_df['监控项的值'] > 3]
+    #
+    # print('正常值：%s; 异常值：%s;总数：%s'% (a_df.count(), b_df.count(), sigma_res_df.count()), sep='\n')
+    #
+    # data_list = sorted(np.array(values))
+    # Q1 = round(np.quantile(data_list, 0.25), 2)
+    # Q3 = round(np.quantile(data_list, 0.75), 2)
+    # box_up_threshold = round(Q3 + 1.5 * (Q3 - Q1), 2)
+    # box_down_threshold = round(Q1 - 1.5 * (Q3 - Q1), 2)
+    # box_res_df = df[(df['监控项的值'] >= box_down_threshold) & (df['监控项的值'] <= box_up_threshold)]
+    # a_df = box_res_df[box_res_df['监控项的值'] <= 3]
+    # b_df = box_res_df[box_res_df['监控项的值'] > 3]
+    #
+    # print('正常值：%s; 异常值：%s;总数：%s'% (a_df.count(), b_df.count(), box_res_df.count()), sep='\n')
+
+    # 去噪点
+    # res_df1 = rolling_filter(df1, 50, 1)
+    # res_df2 = rolling_filter(df2, 50, 1)
+    # res_df.to_excel('3-sigma_100_去噪点.xls', index=None)
+    # a_df = res_df[res_df['监控项的值'] <= 3]
+    # b_df = res_df[res_df['监控项的值'] > 3]
+
+    # print('50-正常值：%s; 异常值：%s;总数：%s'% (a_df.count(), b_df.count(), res_df.count()), sep='\n')
+
+    # 去噪点
+    res_df = rolling_filter(df, 100, 1)
+    # res_df.to_excel('3-sigma_100_去噪点.xls', index=None)
+    # a_df = res_df[res_df['监控项的值'] <= 3]
+    # b_df = res_df[res_df['监控项的值'] > 3]
+
+    # print('100-正常值：%s; 异常值：%s;总数：%s' % (a_df.count(), b_df.count(), res_df.count()), sep='\n')
+
+    # 去噪点
+    res_df = rolling_filter(df, 300, 1)
+    # res_df.to_excel('3-sigma_100_去噪点.xls', index=None)
+    # a_df = res_df[res_df['监控项的值'] <= 3]
+    # b_df = res_df[res_df['监控项的值'] > 3]
+
+    # print('300-正常值：%s; 异常值：%s;总数：%s' % (a_df.count(), b_df.count(), res_df.count()), sep='\n')
+
+    # 去噪点
+    res_df = rolling_filter(df, 500, 1)
+    # res_df.to_excel('3-sigma_100_去噪点.xls', index=None)
+    # a_df = res_df[res_df['监控项的值'] <= 3]
+    # b_df = res_df[res_df['监控项的值'] > 3]
+
+    # print('500-正常值：%s; 异常值：%s;总数：%s' % (a_df.count(), b_df.count(), res_df.count()), sep='\n')
+
+    # 去噪点
+    res_df2 = rolling_filter(df, 1000, 2)
+    # res_df.to_excel('3-sigma_100_去噪点.xls', index=None)
+    # a_df = res_df[res_df['监控项的值'] <= 3]
+    # b_df = res_df[res_df['监控项的值'] > 3]
+    #
+    # print('1000-正常值：%s; 异常值：%s;总数：%s' % (a_df.count(), b_df.count(), res_df.count()), sep='\n')
+
+    # 去噪点
+    res_df = rolling_filter(df, 2000, 1)
+    # res_df.to_excel('3-sigma_100_去噪点.xls', index=None)
+    # a_df = res_df[res_df['监控项的值'] <= 3]
+    # b_df = res_df[res_df['监控项的值'] > 3]
+    #
+    # print('2000-正常值：%s; 异常值：%s;总数：%s' % (a_df.count(), b_df.count(), res_df.count()), sep='\n')
+    # exit()
 
 
     # plt.plot(df['日期'], df['监控项的值'])
@@ -259,38 +340,42 @@ if __name__ == '__main__':
     # new_df.drop(new_df[np.isnan(new_df['监控项的值'])].index, inplace=True)
     #
     # 日，最大值
-    statistics = groupby_fun(df, 'D')
+    # statistics = groupby_fun(df, 'D')
     # print(statistics.index)
-    new_df = {
-        '日期': statistics.index.to_list(),
-        '监控项的值': statistics['max'].to_list()
-    }
-    new_df = pd.DataFrame(new_df)
-    new_df.drop(new_df[np.isnan(new_df['监控项的值'])].index, inplace=True)
+    # new_df = {
+    #     '日期': statistics.index.to_list(),
+    #     '监控项的值': statistics['max'].to_list()
+    # }
+    # new_df = pd.DataFrame(new_df)
+    # new_df.drop(new_df[np.isnan(new_df['监控项的值'])].index, inplace=True)
 
 
     # 变化率
-    k, res_res_df = changing_rate(new_df, 20, 2)
+    # k, res_res_df = changing_rate(new_df, 20, 2)
 
-    title = title + '(%s)'% k
+    # title = title + '(%s)'% k
 
+
+    # 轧制规格-加速度有效值
 
     fig = plt.figure(figsize=(12, 6))
     ax = fig.add_subplot(111)
-    ax.legend(['日-最大值', '变化率'])
-    ax.set_ylabel('日-最大值')
+    # ax.legend(['加速度有效值'])
+    # ax.set_ylabel('监控项的值')
     ax.set_xlabel('日期')
-    line1 = ax.plot(new_df['日期'], new_df['监控项的值'], label='日-最大值')
+    # line1 = ax.plot(res_df['日期'], res_df['res_df'])
+    ax.plot(res_df2['日期'], res_df2['监控项的值'])
+    # ax.plot(res_df1['日期'], res_df1['监控项的值'])
 
-    ax1 = ax.twinx()
+    # ax1 = ax.twinx()
+    #
+    # line2 = ax1.plot(res_df['日期'], res_df['监控项的值'], color='r')
+    # ax1.set_ylabel('变化率')
+    #
+    # lines = line1 + line2
+    # labels = [label.get_label for label in lines]
 
-    line2 = ax1.plot(new_df['日期'], res_res_df['监控项的值'], color='r', label='变化率')
-    ax1.set_ylabel('变化率')
-
-    lines = line1 + line2
-    labels = [label.get_label for label in lines]
-
-    ax.legend(lines, ['日-最大值', '变化率'])
+    # ax.legend(lines, ['日-最大值', '变化率'])
 
     plt.title(title)
     plt.grid()
