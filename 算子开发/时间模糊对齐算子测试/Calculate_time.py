@@ -65,10 +65,10 @@ class Calculate_time:
                     out2.time = [str(time_in2[0][:23])]
 
                 out1.start_time = [str(A1.start_time)[:23]]
-                out1.data = np.array([data_1.data[0]])
+                out1.data = np.array([np.nan])
 
                 out2.start_time = [str(A2.start_time)[:23]]
-                out2.data = np.array([data_2.data[0]])
+                out2.data = np.array([np.nan])
 
 
         result['Out1'] = out1
